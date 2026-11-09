@@ -40,6 +40,34 @@ class TradeRecord:
     realized_rr: float
     portfolio_equity: float
 
+def format_timestamp(ts):
+    """Cleanly format datetime for intraday (with time) and daily (date only)"""
+    try:
+        if hasattr(ts, 'hour') and (ts.hour != 0 or ts.minute != 0):
+            return ts.strftime('%Y-%m-%d %H:%M')
+        elif hasattr(ts, 'date'):
+            return str(ts.date())
+        return str(ts)[:16]
+    except Exception:
+        return str(ts)
+
+def get_lot_size(symbol: str) -> int:
+    """Determine standard lot size for Indian Indices, Commodities, and Stocks"""
+    sym = symbol.upper()
+    if "NIFTY" in sym and "BANK" not in sym:
+        return 25
+    elif "BANK" in sym:
+        return 15
+    elif "CRUDE" in sym or "CL=F" in sym:
+        return 100
+    elif "NATURAL" in sym or "NG=F" in sym:
+        return 1250
+    elif "SILVER" in sym or "SI=F" in sym:
+        return 30
+    elif "GOLD" in sym or "GC=F" in sym:
+        return 1
+    return 1
+
 class AlphaBacktestEngine:
     def __init__(
         self,
@@ -108,10 +136,10 @@ class AlphaBacktestEngine:
         emas = df['EMA_Trend'].values
         atrs = df['ATR'].values
 
-        lot_size = 25 if "NIFTY" in self.symbol.upper() else (15 if "BANK" in self.symbol.upper() else 1)
+        lot_size = get_lot_size(self.symbol)
 
         for i in range(max(donchian_period, ema_trend_period) + 2, len(df)):
-            date_str = str(dates[i].date())
+            date_str = format_timestamp(dates[i])
             price = closes[i]
 
             # Track daily equity
@@ -299,13 +327,13 @@ class AlphaBacktestEngine:
         closes = df['Close'].values
         dirs = df['ST_Dir'].values
 
-        lot_size = 25 if "NIFTY" in self.symbol.upper() else (15 if "BANK" in self.symbol.upper() else 1)
+        lot_size = get_lot_size(self.symbol)
 
         in_pos = False
         current_trade = {}
 
         for i in range(st_period + 2, len(df)):
-            date_str = str(dates[i].date())
+            date_str = format_timestamp(dates[i])
             price = closes[i]
 
             self.equity_curve.append({

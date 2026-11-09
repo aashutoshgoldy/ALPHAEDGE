@@ -4,21 +4,35 @@ import numpy as np
 from datetime import datetime, timedelta
 
 POPULAR_SYMBOLS = {
-    "NIFTY 50 Index": "^NSEI",
-    "BANK NIFTY Index": "^NSEBANK",
-    "RELIANCE": "RELIANCE.NS",
-    "TATA MOTORS": "TATAMOTORS.NS",
-    "HDFC BANK": "HDFCBANK.NS",
-    "ICICI BANK": "ICICIBANK.NS",
-    "STATE BANK OF INDIA (SBIN)": "SBIN.NS",
-    "BAJAJ FINANCE": "BAJFINANCE.NS",
-    "TRENT (Momentum)": "TRENT.NS",
-    "ZOMATO (High Beta)": "ZOMATO.NS",
-    "HAL (Defence Momentum)": "HAL.NS",
-    "BITCOIN (Crypto)": "BTC-USD",
-    "SOLANA (High Beta Crypto)": "SOL-USD",
-    "NVIDIA (US Tech)": "NVDA",
-    "TESLA (US High Beta)": "TSLA"
+    # --- COMMODITIES (MCX / Global Futures & ETFs) ---
+    "🥇 GOLD Futures (MCX / Global)": "GC=F",
+    "🥈 SILVER Futures (MCX / Global)": "SI=F",
+    "🛢️ CRUDE OIL Futures (MCX / WTI)": "CL=F",
+    "🔥 NATURAL GAS Futures (MCX / Henry Hub)": "NG=F",
+    "🥉 COPPER Futures": "HG=F",
+    "🟡 GOLDBEES (NSE Gold ETF)": "GOLDBEES.NS",
+    "⚪ SILVERBEES (NSE Silver ETF)": "SILVERBEES.NS",
+
+    # --- INDIAN INDICES ---
+    "🇮🇳 NIFTY 50 Index": "^NSEI",
+    "🇮🇳 BANK NIFTY Index": "^NSEBANK",
+
+    # --- MOMENTUM & HIGH BETA INDIAN STOCKS ---
+    "📈 TRENT (Momentum)": "TRENT.NS",
+    "🚀 ZOMATO (High Beta)": "ZOMATO.NS",
+    "🛡️ HAL (Defence Momentum)": "HAL.NS",
+    "🏢 RELIANCE": "RELIANCE.NS",
+    "🚗 TATA MOTORS": "TATAMOTORS.NS",
+    "🏦 HDFC BANK": "HDFCBANK.NS",
+    "🏦 ICICI BANK": "ICICIBANK.NS",
+    "🏦 STATE BANK OF INDIA (SBIN)": "SBIN.NS",
+    "💳 BAJAJ FINANCE": "BAJFINANCE.NS",
+
+    # --- CRYPTO & US ---
+    "₿ BITCOIN (Crypto)": "BTC-USD",
+    "🟣 SOLANA (High Beta Crypto)": "SOL-USD",
+    "💻 NVIDIA (US Tech)": "NVDA",
+    "⚡ TESLA (US High Beta)": "TSLA"
 }
 
 def clean_yfinance_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,18 +81,26 @@ def generate_synthetic_data(symbol: str, days: int = 365, base_price: float = 24
 
 def fetch_market_data(symbol: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
     """
-    Fetch historical candles via yfinance.
-    period: 1mo, 3mo, 6mo, 1y, 2y, 5y
-    interval: 5m, 15m, 1h, 1d
+    Fetch historical candles via yfinance with automatic interval-period compatibility.
+    period: 1d, 5d, 7d, 1mo, 3mo, 6mo, 1y, 2y, 5y
+    interval: 1m, 2m, 5m, 15m, 30m, 1h, 1d
     """
+    # Yahoo Finance strict limit safety clamps
+    if interval == "1m":
+        if period not in ["1d", "3d", "5d", "7d"]:
+            period = "5d"
+    elif interval in ["2m", "5m", "15m", "30m", "90m"]:
+        if period in ["1y", "2y", "5y", "max"]:
+            period = "60d"
+
     try:
         ticker = yf.Ticker(symbol)
         df = ticker.history(period=period, interval=interval)
-        if df is not None and len(df) > 10:
+        if df is not None and len(df) >= 5:
             return clean_yfinance_dataframe(df)
         else:
-            print(f"[Warning] yfinance returned empty dataframe for {symbol}. Using synthetic fallback.")
+            print(f"[Warning] yfinance returned empty dataframe for {symbol} ({period}, {interval}). Using fallback.")
             return generate_synthetic_data(symbol)
     except Exception as e:
-        print(f"[Error fetching data for {symbol}]: {e}. Using synthetic fallback.")
+        print(f"[Error fetching data for {symbol}]: {e}. Using fallback.")
         return generate_synthetic_data(symbol)

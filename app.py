@@ -75,18 +75,46 @@ st.sidebar.markdown("## ⚙️ Strategy & Capital Controls")
 # 1. Asset & Data
 st.sidebar.subheader("1. Asset & Data Source")
 selected_preset = st.sidebar.selectbox(
-    "Choose Preset Symbol:",
+    "Choose Preset Symbol / Commodity:",
     list(POPULAR_SYMBOLS.keys()),
     index=0
 )
-custom_ticker = st.sidebar.text_input("Or Enter Custom Yahoo Ticker (e.g. TATAPOWER.NS):", "")
+custom_ticker = st.sidebar.text_input("Or Enter Custom Ticker (e.g. GC=F, CL=F, TATAPOWER.NS):", "")
 symbol = custom_ticker.strip() if custom_ticker.strip() else POPULAR_SYMBOLS[selected_preset]
 
-col_d1, col_d2 = st.sidebar.columns(2)
-with col_d1:
-    history_period = st.selectbox("Period", ["6mo", "1y", "2y", "5y"], index=1)
-with col_d2:
-    timeframe = st.selectbox("Interval", ["1d", "1h", "15m"], index=0)
+# Timeframe selector with full Intraday (1m to 1d)
+timeframe_choice = st.sidebar.selectbox(
+    "Candle Interval (Timeframe):",
+    [
+        "1m (Intraday Scalping)",
+        "2m (Intraday)",
+        "5m (Intraday Trend)",
+        "15m (Intraday/BTST)",
+        "30m (Half-Hourly)",
+        "1h (Hourly Trend)",
+        "1d (Daily Swing)"
+    ],
+    index=2  # default 5m
+)
+clean_interval = timeframe_choice.split()[0]  # Extracts '1m', '5m', '1d'
+
+# Dynamic Lookback Period based on exchange limits
+if clean_interval == "1m":
+    period_options = ["1d", "3d", "5d", "7d"]
+    default_period_idx = 2  # 5d
+    st.sidebar.caption("⚡ *1-Min Scalping: Exchange provides up to last 7 days data.*")
+elif clean_interval in ["2m", "5m", "15m", "30m"]:
+    period_options = ["1d", "5d", "1mo", "60d"]
+    default_period_idx = 2  # 1mo
+    st.sidebar.caption("⚡ *Intraday: Exchange provides up to last 60 days data.*")
+elif clean_interval == "1h":
+    period_options = ["1mo", "3mo", "6mo", "1y", "2y"]
+    default_period_idx = 2  # 6mo
+else:
+    period_options = ["3mo", "6mo", "1y", "2y", "5y"]
+    default_period_idx = 2  # 1y
+
+history_period = st.sidebar.selectbox("Historical Lookback Period:", period_options, index=default_period_idx)
 
 # 2. Capital & Money Management
 st.sidebar.subheader("2. Capital & Position Sizing")
@@ -134,11 +162,11 @@ st.sidebar.markdown("---")
 brokerage_fees = st.sidebar.checkbox("Include Brokerage & Slippage (₹20/order)", value=True)
 
 # ----------------- DATA FETCHING -----------------
-with st.spinner(f"Fetching historical market data for {symbol}..."):
-    df = fetch_market_data(symbol, period=history_period, interval=timeframe)
+with st.spinner(f"Fetching historical market data for {symbol} ({clean_interval})..."):
+    df = fetch_market_data(symbol, period=history_period, interval=clean_interval)
 
-if df.empty or len(df) < 30:
-    st.error(f"Could not load sufficient price data for symbol '{symbol}'. Try another ticker.")
+if df.empty or len(df) < 10:
+    st.error(f"Could not load sufficient price data for symbol '{symbol}' on {clean_interval} timeframe. Try adjusting lookback period.")
     st.stop()
 
 # ----------------- BACKTEST EXECUTION -----------------
